@@ -114,24 +114,42 @@ function bufPop(buf: DynBuf, len: number): void {
     buf.length -= len;
 }
 
-function cutMessage(buf: DynBuf): null|Buffer {
+function cutMessage(buf: DynBuf, prevDelIdx: number, setPrevDelIdx: CallableFunction): null|Buffer {
     // messages are separated by '\n'
-    const idx = buf.data.subarray(0, buf.length).indexOf('\n');
+    const idx = buf.data.subarray(prevDelIdx, buf.length).indexOf('\n');
     if (idx < 0) {
         return null;    // not complete
     }
     // make a copy of the message and move the remaining data to the front
-    const msg = Buffer.from(buf.data.subarray(0, idx + 1));
-    bufPop(buf, idx + 1);
+    const msg = Buffer.from(buf.data.subarray(prevDelIdx, prevDelIdx + idx + 1));//subarray gives the relative index so we add prevDelIdx to the (idx + 1)
+    
+    //we can check the length of space available in front and only call bufPop when the space is 1/2 the total capacity of the buf 
+    //we will have to carefully manage the the logical length of the buffer as well
+    //STEPS:
+    //Use index of \n to start the data.subarray from that index + 1 to find the next \n
+    //For this we can store the idx value in a var like prevIdx we could be either 0 or prev Index of \n
+    //Extra: Used setPrevIdx callback function to set the variable value that was not in the cutMessage function scope
+    //But we cannot initialize the varibale inside cutMessage 
+    //At the bottom before calling bufPop we can check if the length from 0 to current idx is 1/2 of buf.data.length 
+    //Check if the data infront as reached the threshold
+    const nextDelIdx = prevDelIdx + idx + 1;
+    if (nextDelIdx >= buf.data.length / 2) {
+        bufPop(buf, nextDelIdx);
+        setPrevDelIdx(0)
+    } else {
+        setPrevDelIdx(nextDelIdx);
+    }
+    
     return msg;
 }
 
 async function serveClient(socket: net.Socket): Promise<void> {
     const conn: TCPConn = soInit(socket);
     const buf: DynBuf = {data: Buffer.alloc(0), length: 0};
+    let prevDelIdx: number = 0;
     while (true) {
         // try to get 1 message from the buffer
-        const msg = cutMessage(buf);
+        const msg = cutMessage(buf, prevDelIdx, (idx: number) => (prevDelIdx = idx));
         if (!msg) {
             const data: Buffer = await soRead(conn);
             bufPush(buf, data);
