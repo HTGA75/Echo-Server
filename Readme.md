@@ -39,6 +39,18 @@ Most backend development hides networking behind Express/Fastify. **I wanted to 
 
 - centralized error handling + cleanup
 
+### Simple Parsing Protocol (New)
+
+- Implements a robust message parsing strategy using strictly typed TypeScript.
+
+- **Dynamic Buffers (`DynBuf`)**:
+  - Automatically resizes the buffer capacity by powers of two when full (amortized O(1) appending).
+  - Efficiently handles incoming chunks of arbitrary size.
+
+- **Smart Message Parsing**:
+  - Parses newline-delimited messages (`\n`).
+  - **Lazy Shifting**: Instead of shifting data after every consume (which is O(N^2)), it only removes data from the front (`bufPop`) when the read head advances beyond 50% of the buffer. This ensures O(N) performance for parsing.
+
 ## Key engineering concepts explored
 
 - TCP socket lifecycle
